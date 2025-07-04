@@ -18,11 +18,12 @@ import {
   Search
 } from 'lucide-react';
 import { useWeb3 } from '@/components/web3-provider';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { theme, setTheme } = useTheme();
-  const { account, isConnected, connect, disconnect, promptTokenBalance } = useWeb3();
+  const { account, isConnected, connect, disconnect, promptTokenBalance, switchAccount } = useWeb3();
 
   const formatAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -76,19 +77,23 @@ export function Navigation() {
               <span className="sr-only">Toggle theme</span>
             </Button>
 
-            {/* Wallet Connection */}
+            {/* Wallet Connection/User Dropdown */}
             {isConnected ? (
-              <div className="flex items-center space-x-2">
-                <Link href={`/profile/${account}`}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
-                    <Wallet className="w-4 h-4 mr-2" />
-                    {formatAddress(account!)}
+                    User {formatAddress(account!)}
                   </Button>
-                </Link>
-                <Button variant="ghost" size="sm" onClick={disconnect}>
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href={`/profile/${account}`}>My Profile</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={switchAccount}>Switch Account</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={disconnect}>Logout</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <Button onClick={connect} size="sm">
                 <Wallet className="w-4 h-4 mr-2" />

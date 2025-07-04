@@ -10,6 +10,7 @@ import {
   PROMPT_MARKETPLACE_ADDRESS,
   PROMPT_MARKETPLACE_ABI
 } from '../lib/contracts';
+import { useToast } from '@/hooks/use-toast';
 
 interface Web3ContextType {
   account: string | null;
@@ -20,6 +21,7 @@ interface Web3ContextType {
   disconnect: () => void;
   tipCreator: (to: string, amount: string) => Promise<void>;
   purchasePrompt: (promptId: string, price: string) => Promise<void>;
+  switchAccount: () => Promise<void>;
 }
 
 const Web3Context = createContext<Web3ContextType | null>(null);
@@ -36,13 +38,36 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
   const [balance, setBalance] = useState('0');
   const [promptTokenBalance, setPromptTokenBalance] = useState('0');
   const [isConnected, setIsConnected] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     checkConnection();
+    // Listen for account changes in the wallet
+    if (typeof window !== 'undefined' && window.ethereum) {
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+      return () => {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+      };
+    }
   }, []);
+
+  const handleAccountsChanged = async (accounts: string[]) => {
+    if (accounts.length === 0) {
+      disconnect();
+    } else {
+      setAccount(accounts[0]);
+      setIsConnected(true);
+      await updateBalances(accounts[0]);
+      localStorage.removeItem('promptfi-disconnected');
+    }
+  };
 
   const checkConnection = async () => {
     if (typeof window !== 'undefined' && window.ethereum) {
+      // Prevent auto-connect if user previously disconnected
+      if (localStorage.getItem('promptfi-disconnected') === 'true') {
+        return;
+      }
       try {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const accounts = await provider.listAccounts();
@@ -67,6 +92,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
         setAccount(address);
         setIsConnected(true);
         await updateBalances(address);
+        localStorage.removeItem('promptfi-disconnected');
       } catch (error) {
         console.error('Error connecting wallet:', error);
       }
@@ -78,6 +104,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
     setIsConnected(false);
     setBalance('0');
     setPromptTokenBalance('0');
+    localStorage.setItem('promptfi-disconnected', 'true');
   };
 
   const updateBalances = async (address: string) => {
@@ -135,6 +162,15 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const switchAccount = async () => {
+    disconnect();
+    toast({
+      title: 'Switch Account',
+      description: 'To switch accounts, please change your active account in your wallet (e.g., MetaMask) and then click "Connect Wallet" again.',
+    });
+    // Do not auto-call connect; let user change account in wallet and reconnect
+  };
+
   return (
     <Web3Context.Provider value={{
       account,
@@ -144,7 +180,8 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
       connect,
       disconnect,
       tipCreator,
-      purchasePrompt
+      purchasePrompt,
+      switchAccount
     }}>
       {children}
     </Web3Context.Provider>
